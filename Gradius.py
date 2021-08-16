@@ -4,6 +4,11 @@ from pygame.locals import *
 from random import *
 from math import *
 
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+import pywavefront
+
 from pygame.time import Clock
 from gamestates import Gamestate
 import objects as obj
@@ -75,7 +80,6 @@ def start_game():
 
     pass
 
-
 def stop_game():
     """
     resets the game variables and objects
@@ -99,7 +103,6 @@ def stop_game():
 
     pass
 
-
 def render_scores(da_screen, scores, positions):
     """
     creates an array of renderable text objects
@@ -110,7 +113,6 @@ def render_scores(da_screen, scores, positions):
         score_render.append(obj.Text(positions[index][0], positions[index][1], da_screen, '{findex}. {name} - {score}'.format(findex = index, name = scores[index]["name"], score = scores[index]["score"]), font_joystix, 24), )
 
     return score_render
-
 
 def if_highscore():
     """
@@ -125,7 +127,6 @@ def if_highscore():
             return True
 
     return False
-
 
 def update_score():
     """
@@ -143,8 +144,6 @@ def update_score():
             scores.pop(len(scores)-1)
             name = ''
             return
-        
-        
 
 def load_scores():
     """
@@ -168,7 +167,6 @@ def load_scores():
 
     return scores
 
-
 def save_scores():
     """
     writes the current scores down into the pickle file
@@ -179,10 +177,8 @@ def save_scores():
         #saves whatever is in the scores into the file
         pickle.dump(scores, file)
 
-
 def check_collision(hitbox1, hitbox2):
     return hitbox1.colliderect(hitbox2)
-
 
 def change_gamestate(new_state):
     """
@@ -192,7 +188,6 @@ def change_gamestate(new_state):
     pygame.display.set_caption(str(new_state).split('.')[-1])
     gamestate = new_state
 
-
 def quit():
     """
     shuts down the game and saves the scores
@@ -200,7 +195,6 @@ def quit():
     save_scores()
     pygame.quit
     sys.exit()
-
 
 class MenuManager:
     """
@@ -229,7 +223,6 @@ class MenuManager:
             
         for label in self.labels:
             label.render()
-
 
 class GameManager:
     """
@@ -270,24 +263,23 @@ class GameManager:
         delta_time = (pygame.time.get_ticks() - self._last_time)
         self._last_time = pygame.time.get_ticks()
 
-
 class GameObject:
     
-    def __init__(self, position_x, position_y, sprite):
+    def __init__(self, position_x, position_y, model):
         self.position = pygame.Vector2(position_x, position_y)
         self.velocity = pygame.Vector2(0, 0)
-        self.sprite = sprite
+        self.model = model
         self.do_draw = True
 
     @property
     def hitbox(self):
-        hitbox = self.sprite.get_rect()
+        hitbox = self.model.get_rect()
         hitbox.x = self.position.x
         hitbox.y = self.position.y
         return hitbox
 
     def set_sprite(self, new_sprite):
-        self.sprite = new_sprite
+        self.model = new_sprite
 
     # Moves the gameobject
     def update(self, events):
@@ -295,11 +287,10 @@ class GameObject:
 
     def draw(self):
         global screen
-        screen.blit(self.sprite,self.position)
+        screen.blit(self.model,self.position)
 
     def destroy(self):
         objects.remove(self)
-
 
 class Entity(GameObject):
 
@@ -326,14 +317,13 @@ class Entity(GameObject):
     def heal(self):
         self._hp = min(self._maxHP, self._hp + randint(5, 10))
 
-
 class Player(Entity):
 
-    def __init__(self, position_x, position_y, maxHP, move_speed, bullet_sprite):
+    def __init__(self, position_x, position_y, maxHP, move_speed, bullet_model):
 
-        super().__init__(position_x, position_y, maxHP, sprite = pygame.transform.scale(player_sprite, (70, 35)))
+        super().__init__(position_x, position_y, maxHP, sprite = player_model)
 
-        self._bullet_manager = BulletManager(bullet_sprite)
+        self._bullet_manager = BulletManager(bullet_model)
 
         self.move_speed = move_speed
 
@@ -352,9 +342,9 @@ class Player(Entity):
         self._pulse = False #Set to True for alternate indicator for when big_shoot() is ready
 
         #Animations
-        self._exp = [explosion_1, explosion_2, explosion_3, explosion_4, explosion_5]
+        # self._exp = [explosion_1, explosion_2, explosion_3, explosion_4, explosion_5]
 
-        self._pulse = [pulse_1, pulse_2, pulse_3, pulse_4, pulse_5, pulse_6, pulse_7, pulse_8, pulse_9, pulse_10, pulse_11, pulse_12, pulse_13, pulse_14]
+        # self._pulse = [pulse_1, pulse_2, pulse_3, pulse_4, pulse_5, pulse_6, pulse_7, pulse_8, pulse_9, pulse_10, pulse_11, pulse_12, pulse_13, pulse_14]
 
 
     def update(self, events):
@@ -367,21 +357,19 @@ class Player(Entity):
 
         time = pygame.time.get_ticks()
 
-        self.velocity = pygame.Vector2(0, 0)
-
-        #movement
-        if K_w in keys and not K_s in keys or K_UP in keys and not K_DOWN in keys:
-            self.velocity.y = -self.move_speed * delta_time
-        if K_s in keys and not K_w in keys or K_DOWN in keys and not K_UP in keys:
-            self.velocity.y = self.move_speed * delta_time
-        if K_a in keys and not K_d in keys or K_LEFT in keys and not K_RIGHT in keys:
-            self.velocity.x = -self.move_speed * 0.8 * delta_time
-        if K_d in keys and not K_a in keys or K_RIGHT in keys and not K_LEFT in keys:
-            self.velocity.x = self.move_speed * 0.8 * delta_time
+        #up
+        if keys & {K_UP, K_w}:
+            self.model.translate(0, 0.1, 0)
+        #left
+        if keys & {K_LEFT, K_a}:
+            self.model.translate(-0.1, 0, 0)
+        #down
+        if keys & {K_DOWN, K_s}:
+            self.model.translate(0, -0.1, 0)
+        #right
+        if keys & {K_RIGHT, K_d}:
+            self.model.translate(0.1, 0, 0)
             
-        #Screen border check!
-        self.position = pygame.Vector2(max(min(self.position.x, SCREEN_WIDTH - 30), -30), max(min(self.position.y, SCREEN_HEIGHT - 30), -30))
-
         #Alternate shooting types
         for event in events:
             if event.type == KEYDOWN and event.key == K_SPACE:
@@ -650,7 +638,6 @@ class Boss(Entity):
             active_boss = False
             super().destroy()
 
-
 class EnemyManager:
 
     def __init__(self, interval):
@@ -699,7 +686,6 @@ class EnemyManager:
                     self._boss_interval = randint(5, 15)
                     self._difficulty += 1
                     self.total_count += 1
-
 
 class Bullet(GameObject):
 
@@ -756,7 +742,6 @@ class Bullet(GameObject):
             bullets.remove(self)
             super().destroy()
         
-
 class BulletManager:
     
     def __init__(self, sprite):
@@ -806,7 +791,6 @@ class BulletManager:
         bullets.append(temp)
         objects.append(temp)
 
-
 class PowerUp(GameObject):
     def __init__(self, origin_x, origin_y):
         self.type = choice(["Speed", "Power"])
@@ -831,42 +815,43 @@ pygame.display.set_caption(str(gamestate).split('.')[-1])
 ## game assets
 try:
     #sprite for the bullet
-    bullet_sprite = pygame.image.load('Sprites/Bullet.png').convert_alpha()
+    bullet_sprite = pywavefront.Wavefront('./Models/bullet.obj').parse()
 
     #player sprite and assembly
-    player_sprite = pygame.image.load('Sprites/Player.png').convert_alpha()
-    red_player_sprite = pygame.image.load('Sprites/Red_Player.png').convert_alpha()
+    player_model = pywavefront.Wavefront('./Models/ship.obj').parse()
+    #use coloring
+    # red_player_sprite = pygame.image.load('Sprites/Red_Player.png').convert_alpha()
 
-    #Pulse animation for alternate indicator for big_shoot() being ready
-    pulse_1 = pygame.image.load('Sprites/Pulse1.png').convert_alpha()
-    pulse_2 = pygame.image.load('Sprites/Pulse2.png').convert_alpha()
-    pulse_3 = pygame.image.load('Sprites/Pulse3.png').convert_alpha()
-    pulse_4 = pygame.image.load('Sprites/Pulse4.png').convert_alpha()
-    pulse_5 = pygame.image.load('Sprites/Pulse5.png').convert_alpha()
-    pulse_6 = pygame.image.load('Sprites/Pulse6.png').convert_alpha()
-    pulse_7 = pygame.image.load('Sprites/Pulse7.png').convert_alpha()
-    pulse_8 = pygame.image.load('Sprites/Pulse8.png').convert_alpha()
-    pulse_9 = pygame.image.load('Sprites/Pulse9.png').convert_alpha()
-    pulse_10 = pygame.image.load('Sprites/Pulse10.png').convert_alpha()
-    pulse_11 = pygame.image.load('Sprites/Pulse11.png').convert_alpha()
-    pulse_12 = pygame.image.load('Sprites/Pulse12.png').convert_alpha()
-    pulse_13 = pygame.image.load('Sprites/Pulse13.png').convert_alpha()
-    pulse_14 = pygame.image.load('Sprites/Pulse14.png').convert_alpha()
+    # #Pulse animation for alternate indicator for big_shoot() being ready
+    # pulse_1 = pygame.image.load('Sprites/Pulse1.png').convert_alpha()
+    # pulse_2 = pygame.image.load('Sprites/Pulse2.png').convert_alpha()
+    # pulse_3 = pygame.image.load('Sprites/Pulse3.png').convert_alpha()
+    # pulse_4 = pygame.image.load('Sprites/Pulse4.png').convert_alpha()
+    # pulse_5 = pygame.image.load('Sprites/Pulse5.png').convert_alpha()
+    # pulse_6 = pygame.image.load('Sprites/Pulse6.png').convert_alpha()
+    # pulse_7 = pygame.image.load('Sprites/Pulse7.png').convert_alpha()
+    # pulse_8 = pygame.image.load('Sprites/Pulse8.png').convert_alpha()
+    # pulse_9 = pygame.image.load('Sprites/Pulse9.png').convert_alpha()
+    # pulse_10 = pygame.image.load('Sprites/Pulse10.png').convert_alpha()
+    # pulse_11 = pygame.image.load('Sprites/Pulse11.png').convert_alpha()
+    # pulse_12 = pygame.image.load('Sprites/Pulse12.png').convert_alpha()
+    # pulse_13 = pygame.image.load('Sprites/Pulse13.png').convert_alpha()
+    # pulse_14 = pygame.image.load('Sprites/Pulse14.png').convert_alpha()
 
     #Powerup sprites. Originally, both types were going to have the same sprite, that's why the first one is just calle PowerUp
-    power_up_sprite = pygame.image.load('Sprites/PowerUp.png').convert_alpha()
-    speed_up_sprite = pygame.image.load('Sprites/SpeedUp.png').convert_alpha()
+    power_up_sprite = pywavefront.Wavefront('./Models/power_up.obj').parse()
+    speed_up_sprite = pywavefront.Wavefront('./Models/speed_up.obj').parse()
 
     #enemy sprites
-    enemy_sprite = pygame.image.load('Sprites/Enemy.png').convert_alpha()
-    boss_sprite = pygame.image.load('Sprites/Boss.png').convert_alpha()
+    enemy_sprite = pywavefront.Wavefront('./Models/enemy.obj').parse()
+    boss_sprite = pywavefront.Wavefront('./Models/boss.obj').parse()
 
-    #explosion stages
-    explosion_1 = pygame.transform.scale(pygame.image.load('Sprites/Exp1.png').convert_alpha(), (4 * 5, 3 * 5))
-    explosion_2 = pygame.transform.scale(pygame.image.load('Sprites/Exp2.png').convert_alpha(), (6 * 5, 5 * 5))
-    explosion_3 = pygame.transform.scale(pygame.image.load('Sprites/Exp3.png').convert_alpha(), (8 * 5, 7 * 5))
-    explosion_4 = pygame.transform.scale(pygame.image.load('Sprites/Exp4.png').convert_alpha(), (20 * 5, 20 * 5))
-    explosion_5 = pygame.transform.scale(pygame.image.load('Sprites/Exp5.png').convert_alpha(), (20 * 5, 20 * 5))
+    # #explosion stages
+    # explosion_1 = pygame.transform.scale(pygame.image.load('Sprites/Exp1.png').convert_alpha(), (4 * 5, 3 * 5))
+    # explosion_2 = pygame.transform.scale(pygame.image.load('Sprites/Exp2.png').convert_alpha(), (6 * 5, 5 * 5))
+    # explosion_3 = pygame.transform.scale(pygame.image.load('Sprites/Exp3.png').convert_alpha(), (8 * 5, 7 * 5))
+    # explosion_4 = pygame.transform.scale(pygame.image.load('Sprites/Exp4.png').convert_alpha(), (20 * 5, 20 * 5))
+    # explosion_5 = pygame.transform.scale(pygame.image.load('Sprites/Exp5.png').convert_alpha(), (20 * 5, 20 * 5))
 
     #audio
     shoot_sound = pygame.mixer.Sound('audio/player_shoot.wav')
@@ -891,9 +876,6 @@ menu_buttons.append(obj.Button(lambda:change_gamestate(Gamestate.RUNNING),(SCREE
 menu_buttons.append(obj.Button(quit,(SCREEN_WIDTH//2)-80,470,screen, ' QUIT ', font_gomarice, 80, pygame.Color(255,255,255), pygame.Color(120,120,120))) # button to shut down the game
 menu_buttons.append(obj.Button(lambda:change_gamestate(Gamestate.SCOREBOARD),(SCREEN_WIDTH//2)-100,360,screen, ' Score ', font_gomarice, 80, pygame.Color(255,255,255), pygame.Color(120,120,120))) # button to shut down the game
 menu_images = []
-menu_images.append(obj.Image(100, 100, screen, 10, player_sprite)) # player sprite for the menu
-for x in range(4):
-    menu_images.append(obj.Image(400+200*x, 160, screen, 10, bullet_sprite)) # 1st bullet sprite for the menu
 menu_labels = []
 menu_labels.append(obj.Text(200,50,screen,'The paper plane that could!', font_joystix,40,pygame.Color(255,255,255)))
 
@@ -974,7 +956,7 @@ while True:
             #if currently viewing the main menu
             elif gamestate == Gamestate.MENU :
                 #get into the game from the menu
-                if event.key == pygame.K_RETURN:
+                if event.key == K_RETURN:
                     change_gamestate(Gamestate.RUNNING)
 
             #if the game is running
@@ -1000,23 +982,23 @@ while True:
             #currently viewing the scoreboard
             elif gamestate == Gamestate.SCOREBOARD:
                 #go to menu from scoreboard
-                if event.key == pygame.K_ESCAPE:
+                if event.key == K_ESCAPE:
                     change_gamestate(Gamestate.MENU)
                 
                 #launches the game from the scoreboard
-                if event.key == pygame.K_RETURN:
+                if event.key == K_RETURN:
                     change_gamestate(Gamestate.RUNNING)
             
             #currently at the name entry
             elif gamestate == Gamestate.GAME_OVER:
                 #accept the name and go to scoreboard
-                if event.key == pygame.K_RETURN and len(name.strip()) > 2:
+                if event.key == K_RETURN and len(name.strip()) > 2:
                     name = name.strip()
                     change_gamestate(Gamestate.SCOREBOARD)
                     update_score()
                     
                 #backspace function
-                elif event.key == pygame.K_BACKSPACE:
+                elif event.key == K_BACKSPACE:
                     name = name[:-1]
                     
                 #add key to name
